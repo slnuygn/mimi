@@ -1,0 +1,260 @@
+version: '3.8'
+
+services:
+  # ============ Infrastructure Services ============
+  redis:
+    image: redis:7-alpine
+    container_name: mimi-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - mimi-network
+
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: mimi-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mimi-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: mimi-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mimi-network
+
+  identity-db:
+    image: postgres:15-alpine
+    container_name: identity-db
+    environment:
+      POSTGRES_DB: identity
+      POSTGRES_USER: ${POSTGRES_USER:-mimi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - identity-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mimi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mimi-network
+
+  classroom-db:
+    image: postgres:15-alpine
+    container_name: classroom-db
+    environment:
+      POSTGRES_DB: classroom
+      POSTGRES_USER: ${POSTGRES_USER:-mimi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password}
+    ports:
+      - "5433:5432"
+    volumes:
+      - classroom-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mimi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mimi-network
+
+  gamification-db:
+    image: postgres:15-alpine
+    container_name: gamification-db
+    environment:
+      POSTGRES_DB: gamification
+      POSTGRES_USER: ${POSTGRES_USER:-mimi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password}
+    ports:
+      - "5434:5432"
+    volumes:
+      - gamification-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mimi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mimi-network
+
+  # ============ Services ============
+  identity-service:
+    build:
+      context: ../services/identity-service
+      dockerfile: Dockerfile
+    container_name: identity-service
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      SERVICE_PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-mimi}:${POSTGRES_PASSWORD:-dev_password}@identity-db:5432/identity
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-key}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-local}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-local}
+    depends_on:
+      identity-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - mimi-network
+    restart: unless-stopped
+
+  gamification-service:
+    build:
+      context: ../services/gamification-service
+      dockerfile: Dockerfile
+    container_name: gamification-service
+    ports:
+      - "3002:3002"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      SERVICE_PORT: 3002
+      DATABASE_URL: postgresql://${POSTGRES_USER:-mimi}:${POSTGRES_PASSWORD:-dev_password}@gamification-db:5432/gamification
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-guest}:${RABBITMQ_DEFAULT_PASS:-guest}@rabbitmq:5672
+      REDIS_STREAMS_ENABLED: "false"
+    depends_on:
+      gamification-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - mimi-network
+    restart: unless-stopped
+
+  classroom-service:
+    build:
+      context: ../services/classroom-service
+      dockerfile: Dockerfile
+    container_name: classroom-service
+    ports:
+      - "3003:3003"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      SERVICE_PORT: 3003
+      DATABASE_URL: postgresql://${POSTGRES_USER:-mimi}:${POSTGRES_PASSWORD:-dev_password}@classroom-db:5432/classroom
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-guest}:${RABBITMQ_DEFAULT_PASS:-guest}@rabbitmq:5672
+      REDIS_STREAMS_ENABLED: "false"
+    depends_on:
+      classroom-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - mimi-network
+    restart: unless-stopped
+
+  video-streaming-service:
+    build:
+      context: ../services/video-streaming-service
+      dockerfile: Dockerfile
+    container_name: video-streaming-service
+    ports:
+      - "3004:3004"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      SERVICE_PORT: 3004
+      REDIS_URL: redis://redis:6379
+      MINIO_ENDPOINT: minio:9000
+      MINIO_BUCKET: mimi-videos
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_USE_SSL: "false"
+    depends_on:
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - mimi-network
+    restart: unless-stopped
+
+  realtime-service:
+    build:
+      context: ../services/realtime-service
+      dockerfile: Dockerfile
+    container_name: realtime-service
+    ports:
+      - "3005:3005"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      SERVICE_PORT: 3005
+      REDIS_URL: redis://redis:6379
+      WS_CORS_ORIGIN: ${WS_CORS_ORIGIN:-http://localhost:3000}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - mimi-network
+    restart: unless-stopped
+
+  # ============ Frontend ============
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: mimi-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+    networks:
+      - mimi-network
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+  rabbitmq-data:
+  minio-data:
+  identity-db-data:
+  classroom-db-data:
+  gamification-db-data:
+
+networks:
+  mimi-network:
+    driver: bridge
