@@ -1,12 +1,16 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import ConditionalNavbar from '@/components/conditional-navbar';
 import './globals.css';
 
 export const metadata: Metadata = {
   title: 'LMS & Real-Time Communication Platform',
   description: 'A comprehensive Learning Management System with real-time communication capabilities',
-  viewport: 'width=device-width, initial-scale=1',
   authors: [{ name: 'Project Team' }],
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
 };
 
 export default function RootLayout({

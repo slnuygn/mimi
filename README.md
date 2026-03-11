@@ -121,7 +121,7 @@ The application is split into **5 independent microservices** based on data resp
 - **Redis Usage**: Pub/Sub for chat, presence tracking, WebRTC signaling state
 - **Optional**: Coturn server for STUN/TURN (WebRTC relay support)
 - **Features**:
-  - WebRTC signaling server
+  - WebRTC signaling server vbcCXDD
   - Peer connection management
   - Real-time text chat via Socket.io
   - Online presence tracking
