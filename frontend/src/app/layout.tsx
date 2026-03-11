@@ -5,7 +5,7 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'LMS & Real-Time Communication Platform',
   description: 'A comprehensive Learning Management System with real-time communication capabilities',
-  authors: [{ name: 'Project Team' }],
+  authors: [{ name: 'Selin Uygun' }],
 };
 
 export const viewport: Viewport = {

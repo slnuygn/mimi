@@ -1,3 +1,5 @@
-export default function Home() {
-  return <div className="h-full" />;
+import { redirect } from 'next/navigation';
+
+export default function Page() {
+  redirect('/home');
 }
