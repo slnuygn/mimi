@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # ============ Infrastructure Services ============
   redis:
@@ -127,7 +125,11 @@ services:
       SERVICE_PORT: 3001
       DATABASE_URL: postgresql://${POSTGRES_USER:-mimi}:${POSTGRES_PASSWORD:-dev_password}@identity-db:5432/identity
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:-dev-secret-key}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-access-secret}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-refresh-secret}
+      JWT_ACCESS_EXPIRES: ${JWT_ACCESS_EXPIRES:-15m}
+      JWT_REFRESH_EXPIRES: ${JWT_REFRESH_EXPIRES:-7d}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-local}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-local}
     depends_on:

@@ -1,13 +1,19 @@
-FROM node:18-alpine
+FROM node:20-bookworm-slim
 
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY package*.json ./
 
-RUN npm install
+RUN npm ci
 
 COPY . .
 
+RUN npx prisma generate
+
 EXPOSE 3001
 
-CMD ["npx", "ts-node", "-r", "tsconfig-paths/register", "src/main.ts"]
+CMD ["sh", "-c", "npx prisma db push && npx ts-node -r tsconfig-paths/register src/main.ts"]

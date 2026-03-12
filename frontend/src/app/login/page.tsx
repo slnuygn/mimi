@@ -1,14 +1,52 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 
+const IDENTITY_API_BASE_URL = process.env.NEXT_PUBLIC_IDENTITY_API_URL ?? 'http://localhost:3001';
+
+type AuthResponse = {
+  accessToken: string;
+  refreshToken: string;
+};
+
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSwapped, setIsSwapped] = useState(false);
+  const [showNotLoggedInMessage, setShowNotLoggedInMessage] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  const extractErrorMessage = (payload: unknown): string => {
+    if (!payload || typeof payload !== 'object') {
+      return 'Error';
+    }
+
+    const maybeMessage = (payload as { message?: unknown }).message;
+    if (Array.isArray(maybeMessage) && maybeMessage.length > 0) {
+      return String(maybeMessage[0]);
+    }
+    if (typeof maybeMessage === 'string' && maybeMessage.length > 0) {
+      return maybeMessage;
+    }
+
+    return 'Error';
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setShowNotLoggedInMessage(params.get('reason') === 'not-logged-in');
+
+    const accessToken = window.localStorage.getItem('accessToken');
+    if (accessToken) {
+      router.replace('/home');
+    }
+  }, [router]);
 
   const pageBackgroundClassName = isSwapped ? 'bg-orange-500' : 'bg-yellow-100';
   const textClassName = isSwapped ? 'text-yellow-100' : 'text-orange-500';
@@ -20,8 +58,44 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement login logic
-    console.log('Login:', { email, password });
+
+    setStatusMessage(null);
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch(`${IDENTITY_API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
+
+      const data = (await response.json()) as AuthResponse | { message?: unknown };
+
+      if (!response.ok) {
+        const errorMessage = extractErrorMessage(data).toLowerCase();
+        if (errorMessage.includes('invalid credentials')) {
+          setStatusMessage('You are not a member.');
+          return;
+        }
+
+        setStatusMessage('Error');
+        return;
+      }
+
+      const authData = data as AuthResponse;
+      window.localStorage.setItem('accessToken', authData.accessToken);
+      window.localStorage.setItem('refreshToken', authData.refreshToken);
+      router.replace('/home');
+    } catch {
+      setStatusMessage('Error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -38,6 +112,10 @@ export default function LoginPage() {
             Mimi
           </button>
           <p className={`${textClassName} text-lg`}>Welcome back!</p>
+          {showNotLoggedInMessage && (
+            <p className="mt-2 text-sm text-red-600">you aren't logged in</p>
+          )}
+          {statusMessage && <p className="mt-2 text-sm text-red-600">{statusMessage}</p>}
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -86,9 +164,10 @@ export default function LoginPage() {
 
             <button
               type="submit"
+              disabled={isSubmitting}
               className={buttonClassName}
             >
-              Login
+              {isSubmitting ? 'Logging in...' : 'Login'}
             </button>
 
             <button

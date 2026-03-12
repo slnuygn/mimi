@@ -1,10 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 
+const IDENTITY_API_BASE_URL = process.env.NEXT_PUBLIC_IDENTITY_API_URL ?? 'http://localhost:3001';
+
+type RegisterStatus = 'success' | 'already-member' | 'error' | null;
+
 export default function RegisterPage() {
+  const router = useRouter();
   const [name, setName] = useState('');
   const [surname, setSurname] = useState('');
   const [email, setEmail] = useState('');
@@ -13,6 +19,8 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSwapped, setIsSwapped] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [registerStatus, setRegisterStatus] = useState<RegisterStatus>(null);
 
   const pageBackgroundClassName = isSwapped ? 'bg-orange-500' : 'bg-yellow-100';
   const textClassName = isSwapped ? 'text-yellow-100' : 'text-orange-500';
@@ -21,17 +29,59 @@ export default function RegisterPage() {
   const buttonClassName = isSwapped
     ? 'w-full bg-yellow-100 text-orange-500 font-bold py-3 rounded-lg hover:bg-yellow-200 transition-colors'
     : 'w-full bg-orange-500 text-white font-bold py-3 rounded-lg hover:bg-orange-600 transition-colors';
+  const passwordsDoNotMatch = confirmPassword.length > 0 && password !== confirmPassword;
+
+  useEffect(() => {
+    const accessToken = window.localStorage.getItem('accessToken');
+    if (accessToken) {
+      router.replace('/home');
+    }
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setRegisterStatus(null);
     
-    if (password !== confirmPassword) {
-      alert('Passwords do not match!');
+    if (passwordsDoNotMatch) {
       return;
     }
 
-    // TODO: Implement registration logic
-    console.log('Register:', { name, surname, email, password });
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch(`${IDENTITY_API_BASE_URL}/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          surname,
+          email,
+          password,
+        }),
+      });
+
+      const data = (await response.json()) as { message?: unknown };
+
+      if (!response.ok) {
+        const message = data?.message;
+        const normalized = Array.isArray(message) ? String(message[0]) : String(message ?? '');
+        if (normalized.toLowerCase().includes('already registered')) {
+          setRegisterStatus('already-member');
+          return;
+        }
+
+        setRegisterStatus('error');
+        return;
+      }
+
+      setRegisterStatus('success');
+    } catch {
+      setRegisterStatus('error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -48,6 +98,13 @@ export default function RegisterPage() {
             Mimi
           </button>
           <p className={`${textClassName} text-lg`}>Create your account!</p>
+          {registerStatus === 'already-member' && (
+            <p className="mt-2 text-sm text-red-600">You are already a member.</p>
+          )}
+          {registerStatus === 'success' && (
+            <p className="mt-2 text-sm text-green-600">You have successfully registered</p>
+          )}
+          {registerStatus === 'error' && <p className="mt-2 text-sm text-red-600">Error</p>}
         </div>
         
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -126,8 +183,11 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className={`block ${textClassName} font-medium mb-2`}>
-                Confirm Password
+              <label htmlFor="confirmPassword" className={`flex items-center justify-between ${textClassName} font-medium mb-2`}>
+                <span>Confirm Password</span>
+                {passwordsDoNotMatch && (
+                  <span className="text-sm text-red-600">Passwords do not match</span>
+                )}
               </label>
               <div className="relative">
                 <input
@@ -156,9 +216,10 @@ export default function RegisterPage() {
 
             <button
               type="submit"
+              disabled={passwordsDoNotMatch || isSubmitting}
               className={buttonClassName}
             >
-              Register
+              {isSubmitting ? 'Registering...' : 'Register'}
             </button>
 
             <button
