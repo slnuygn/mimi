@@ -32,11 +32,30 @@ export default function RegisterPage() {
   const passwordsDoNotMatch = confirmPassword.length > 0 && password !== confirmPassword;
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const accessTokenFromQuery = params.get('accessToken');
+    const refreshTokenFromQuery = params.get('refreshToken');
+    if (accessTokenFromQuery && refreshTokenFromQuery) {
+      window.localStorage.setItem('accessToken', accessTokenFromQuery);
+      window.localStorage.setItem('refreshToken', refreshTokenFromQuery);
+      router.replace('/home');
+      return;
+    }
+
+    if (params.get('error') === 'google-auth-failed') {
+      setRegisterStatus('error');
+      window.history.replaceState({}, '', '/register');
+    }
+
     const accessToken = window.localStorage.getItem('accessToken');
     if (accessToken) {
       router.replace('/home');
     }
   }, [router]);
+
+  const handleGoogleSignIn = () => {
+    window.location.href = `${IDENTITY_API_BASE_URL}/auth/google?intent=register`;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -224,6 +243,7 @@ export default function RegisterPage() {
 
             <button
               type="button"
+              onClick={handleGoogleSignIn}
               className={`${buttonClassName} flex items-center justify-center gap-3`}
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="h-5 w-5">

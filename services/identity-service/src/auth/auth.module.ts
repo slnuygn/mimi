@@ -3,11 +3,14 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { GoogleAuthGuard } from '@/auth/guards/google-auth.guard';
+import { GoogleCallbackGuard } from '@/auth/guards/google-callback.guard';
+import { GoogleStrategy } from '@/auth/strategies/google.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
   imports: [PassportModule, JwtModule.register({})],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, GoogleStrategy, GoogleAuthGuard, GoogleCallbackGuard],
 })
 export class AuthModule {}

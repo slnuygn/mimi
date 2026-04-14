@@ -42,11 +42,29 @@ export default function LoginPage() {
     const params = new URLSearchParams(window.location.search);
     setShowNotLoggedInMessage(params.get('reason') === 'not-logged-in');
 
+    const accessTokenFromQuery = params.get('accessToken');
+    const refreshTokenFromQuery = params.get('refreshToken');
+    if (accessTokenFromQuery && refreshTokenFromQuery) {
+      window.localStorage.setItem('accessToken', accessTokenFromQuery);
+      window.localStorage.setItem('refreshToken', refreshTokenFromQuery);
+      router.replace('/home');
+      return;
+    }
+
+    if (params.get('error') === 'google-auth-failed') {
+      setStatusMessage('Google sign-in failed. Please try again.');
+      window.history.replaceState({}, '', '/login');
+    }
+
     const accessToken = window.localStorage.getItem('accessToken');
     if (accessToken) {
       router.replace('/home');
     }
   }, [router]);
+
+  const handleGoogleSignIn = () => {
+    window.location.href = `${IDENTITY_API_BASE_URL}/auth/google?intent=login`;
+  };
 
   const pageBackgroundClassName = isSwapped ? 'bg-orange-500' : 'bg-yellow-100';
   const textClassName = isSwapped ? 'text-yellow-100' : 'text-orange-500';
@@ -172,6 +190,7 @@ export default function LoginPage() {
 
             <button
               type="button"
+              onClick={handleGoogleSignIn}
               className={`${buttonClassName} flex items-center justify-center gap-3`}
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="h-5 w-5">

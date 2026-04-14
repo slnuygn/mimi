@@ -3,6 +3,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { StudentProfile, TeacherProfile, User } from '@prisma/client';
@@ -12,6 +13,7 @@ import { RedisService } from '../redis/redis.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { AuthResponse } from './types/auth-response.type';
+import { GoogleProfileInput } from '@/auth/types/google-profile.type';
 import { AccessTokenPayload, RefreshTokenPayload } from './types/jwt-payload.type';
 
 type UserWithProfiles = User & {
@@ -189,6 +191,81 @@ export class AuthService {
       },
       accessToken: authorizationHeader?.replace('Bearer ', '') ?? null,
     };
+  }
+
+  async loginWithGoogle(
+    profile: GoogleProfileInput,
+    userAgent?: string,
+    ipAddress?: string,
+  ): Promise<AuthResponse> {
+    const email = profile.email.trim().toLowerCase();
+    if (!email) {
+      throw new UnauthorizedException('Google account email is required');
+    }
+
+    const user = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.user.findUnique({
+        where: { email },
+        include: {
+          studentProfile: true,
+          teacherProfile: true,
+        },
+      });
+
+      if (!existing) {
+        const passwordHash = await bcrypt.hash(`google:${randomUUID()}`, 10);
+        const createdUser = await tx.user.create({
+          data: {
+            email,
+            passwordHash,
+            name: profile.name.trim() || 'Google',
+            surname: profile.surname.trim() || 'User',
+          },
+        });
+
+        const studentProfile = await tx.studentProfile.create({
+          data: { userId: createdUser.id },
+        });
+        const teacherProfile = await tx.teacherProfile.create({
+          data: { userId: createdUser.id },
+        });
+
+        return {
+          ...createdUser,
+          studentProfile,
+          teacherProfile,
+        };
+      }
+
+      const studentProfile =
+        existing.studentProfile ??
+        (await tx.studentProfile.create({
+          data: { userId: existing.id },
+        }));
+      const teacherProfile =
+        existing.teacherProfile ??
+        (await tx.teacherProfile.create({
+          data: { userId: existing.id },
+        }));
+
+      return {
+        ...existing,
+        studentProfile,
+        teacherProfile,
+      };
+    });
+
+    return this.issueSession(
+      user,
+      user.studentProfile.id,
+      user.teacherProfile.id,
+      userAgent,
+      ipAddress,
+    );
+  }
+
+  getFrontendOriginForRedirect(): string {
+    return this.configService.get<string>('FRONTEND_ORIGIN') ?? 'http://localhost:3000';
   }
 
   private async issueSession(

@@ -71,6 +71,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
     networks:
       - mimi-network
 
@@ -132,6 +133,7 @@ services:
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-local}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-local}
+      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-http://localhost:3001/auth/google/callback}
     depends_on:
       identity-db:
         condition: service_healthy
