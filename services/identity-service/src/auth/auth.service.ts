@@ -181,6 +181,7 @@ export class AuthService {
     return {
       user: {
         id: user.id,
+        publicId: user.publicId ?? user.id,
         email: user.email,
         name: user.name,
         surname: user.surname,
@@ -330,6 +331,7 @@ export class AuthService {
       refreshToken,
       user: {
         id: user.id,
+        publicId: user.publicId ?? user.id,
         email: user.email,
         name: user.name,
         surname: user.surname,

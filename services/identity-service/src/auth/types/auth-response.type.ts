@@ -3,6 +3,7 @@ export type AuthResponse = {
   refreshToken: string;
   user: {
     id: string;
+    publicId: string;
     email: string;
     name: string;
     surname: string;
