@@ -2,14 +2,17 @@ import {
   Body,
   Controller,
   Get,
+  Patch,
   Headers,
   Ip,
   Post,
   Query,
   Req,
   Res,
-  UnauthorizedException,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { Response } from 'express';
@@ -22,6 +25,9 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { GoogleProfileInput } from './types/google-profile.type';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { join } from 'path';
+import * as fs from 'fs';
 
 @Controller('auth')
 export class AuthController {
@@ -111,5 +117,51 @@ export class AuthController {
     }
 
     return this.authService.me(user.sub, request.headers.authorization);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('me')
+  @UseInterceptors(FileInterceptor('photo'))
+  async updateProfile(
+    @CurrentUser() user: { sub: string; email: string },
+    @Body()
+    body: {
+      username?: string;
+      name?: string;
+      surname?: string;
+      profilePhotoData?: string;
+      profilePhotoName?: string;
+    },
+    @UploadedFile()
+    file?: {
+      buffer?: Buffer;
+      originalname?: string;
+    },
+  ) {
+    if (!user?.sub) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
+    let profilePhotoUrl: string | undefined = undefined;
+    if (file?.buffer) {
+      const uploadsDir = join(process.cwd(), 'uploads');
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      const safeOriginal = (file.originalname ?? body.profilePhotoName ?? 'profile').replace(/\s+/g, '_');
+      const filename = `${Date.now()}-${safeOriginal}`;
+      fs.writeFileSync(join(uploadsDir, filename), file.buffer);
+      profilePhotoUrl = `/uploads/${filename}`;
+    }
+
+    const updated = await this.authService.updateProfile(user.sub, {
+      name: body.name,
+      surname: body.surname,
+      username: body.username,
+      profilePhotoUrl,
+    });
+
+    return { user: updated };
   }
 }

@@ -12,7 +12,7 @@ export default function PageShell({ children, containerClassName = '' }: PageShe
     <div className="min-h-[calc(100vh-4rem)] bg-[#fffdf2] px-3">
       <div className="mx-auto h-[calc(100vh-4rem)] w-full">
         <div
-          className={`mx-auto h-full w-[75%] border border-amber-100 bg-white/90 shadow-sm ${containerClassName}`.trim()}
+          className={`mx-auto h-full w-[75%] border border-amber-100 border-t-0 bg-white/90 shadow-sm ${containerClassName}`.trim()}
         >
           {children}
         </div>

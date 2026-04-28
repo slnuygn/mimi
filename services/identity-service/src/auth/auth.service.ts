@@ -185,12 +185,37 @@ export class AuthService {
         email: user.email,
         name: user.name,
         surname: user.surname,
+        username: (user as any).username ?? null,
+        profilePhotoUrl: user.profilePhotoUrl ?? null,
       },
       profiles: {
         studentProfileId: user.studentProfile.id,
         teacherProfileId: user.teacherProfile.id,
       },
       accessToken: authorizationHeader?.replace('Bearer ', '') ?? null,
+    };
+  }
+
+  async updateProfile(userId: string, changes: { name?: string; surname?: string; username?: string; profilePhotoUrl?: string }) {
+    const data: any = {};
+    if (typeof changes.name === 'string') data.name = changes.name.trim();
+    if (typeof changes.surname === 'string') data.surname = changes.surname.trim();
+    if (typeof changes.username === 'string') data.username = changes.username.trim();
+    if (typeof changes.profilePhotoUrl === 'string') data.profilePhotoUrl = changes.profilePhotoUrl;
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data,
+    });
+
+    return {
+      id: updated.id,
+      publicId: updated.publicId ?? updated.id,
+      email: updated.email,
+      name: updated.name,
+      surname: updated.surname,
+      username: (updated as any).username ?? null,
+      profilePhotoUrl: updated.profilePhotoUrl ?? null,
     };
   }
 

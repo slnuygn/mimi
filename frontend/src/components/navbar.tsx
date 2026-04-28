@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   HomeIcon as HomeSolid,
   ChatBubbleLeftRightIcon as ChatSolid,
@@ -14,13 +14,54 @@ import {
 } from '@heroicons/react/24/outline';
 
 const iconClassName = 'h-6 w-6';
+const IDENTITY_API_BASE_URL = process.env.NEXT_PUBLIC_IDENTITY_API_URL ?? 'http://localhost:3001';
 
 export default function Navbar() {
   const pathname = usePathname();
   const [isSwapped, setIsSwapped] = useState(false);
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState('');
 
   const isHome = pathname === '/home';
   const isChat = pathname === '/chat';
+
+  useEffect(() => {
+    const loadProfilePhoto = async () => {
+      const accessToken = window.localStorage.getItem('accessToken');
+      if (!accessToken) {
+        setProfilePhotoUrl('');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${IDENTITY_API_BASE_URL}/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = (await response.json()) as {
+          user?: { profilePhotoUrl?: string | null };
+        };
+
+        setProfilePhotoUrl(data.user?.profilePhotoUrl?.trim() ?? '');
+      } catch {
+        setProfilePhotoUrl('');
+      }
+    };
+
+    void loadProfilePhoto();
+
+    const handleProfileUpdated = () => {
+      void loadProfilePhoto();
+    };
+
+    window.addEventListener('profile-updated', handleProfileUpdated);
+    return () => window.removeEventListener('profile-updated', handleProfileUpdated);
+  }, [pathname]);
 
   const headerClassName = isSwapped
     ? 'h-16 border-b border-orange-600 bg-orange-500'
@@ -76,7 +117,7 @@ export default function Navbar() {
           <Link href="/profile" aria-label="Profile" className="transition-opacity hover:opacity-80">
             <div className={`h-6 w-6 rounded-full overflow-hidden border-2 ${avatarBorderClassName} bg-gray-200`}>
               <img
-                src="/avatar-placeholder.png"
+                src={profilePhotoUrl ? `${IDENTITY_API_BASE_URL}${profilePhotoUrl}` : '/avatar-placeholder.png'}
                 alt="Profile"
                 className="h-full w-full object-cover"
               />

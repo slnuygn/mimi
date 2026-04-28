@@ -16,4 +16,4 @@ RUN npx prisma generate
 
 EXPOSE 3001
 
-CMD ["sh", "-c", "npx prisma db push && npx ts-node -r tsconfig-paths/register src/main.ts"]
+CMD ["sh", "-c", "npx prisma migrate deploy && npx ts-node -r tsconfig-paths/register src/main.ts"]
